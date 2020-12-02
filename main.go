@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"strconv"
 	"sync"
 
 	"github.com/pjox/oscar-tools/tools"
@@ -14,6 +15,7 @@ func main() {
 	defer close(done)
 
 	paths, errc := tools.WalkFiles(done, os.Args[1])
+	chunkSize, _ := strconv.ParseInt(os.Args[3], 10, 64)
 
 	var wg sync.WaitGroup
 	maxGoroutines := 10
@@ -23,7 +25,8 @@ func main() {
 		wg.Add(1)
 		go func(path string) {
 			guard <- struct{}{}
-			err := tools.Dedup(path, os.Args[2]) // HLc
+			err := tools.Split(path, os.Args[2], chunkSize) // HLc
+			//err := tools.Dedup(path, os.Args[2]) // HLc
 			if err != nil {
 				log.Fatalln(err)
 			}

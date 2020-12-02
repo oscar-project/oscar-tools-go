@@ -36,6 +36,5 @@ func Dedup(path string, dest string) error {
 	}
 	bufout.Flush()
 	in.Close()
-	out.Close()
-	return nil
+	return out.Close()
 }
