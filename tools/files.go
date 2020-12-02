@@ -21,6 +21,9 @@ func WalkFiles(done <-chan struct{}, root string) (<-chan string, <-chan error) 
 			if !info.Mode().IsRegular() {
 				return nil
 			}
+			if filepath.Ext(path) != ".txt" {
+				return nil
+			}
 			select {
 			case paths <- path: // HL
 			case <-done: // HL

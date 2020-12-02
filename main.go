@@ -1,8 +1,9 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"os"
+	"sync"
 
 	"github.com/pjox/oscar-tools/tools"
 )
@@ -14,15 +15,26 @@ func main() {
 
 	paths, errc := tools.WalkFiles(done, os.Args[1])
 
-	fmt.Println("Hello")
+	var wg sync.WaitGroup
+	maxGoroutines := 10
+	guard := make(chan struct{}, maxGoroutines)
 
-	in, err := os.Open(os.Args[1])
-	if err != nil {
-		fmt.Println(err)
-	}
-	out, err := os.Create(os.Args[2])
-	if err != nil {
-		fmt.Println(err)
+	for path := range paths {
+		wg.Add(1)
+		go func(path string) {
+			guard <- struct{}{}
+			err := tools.Dedup(path, os.Args[2]) // HLc
+			if err != nil {
+				log.Fatalln(err)
+			}
+			<-guard
+			wg.Done()
+		}(path)
 	}
 
+	// Check whether the Walk failed.
+	if err := <-errc; err != nil { // HLerrc
+		log.Fatal(err)
+	}
+	wg.Wait()
 }

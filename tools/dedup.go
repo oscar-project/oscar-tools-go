@@ -2,12 +2,26 @@ package tools
 
 import (
 	"bufio"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/cespare/xxhash"
 )
 
 // Dedup Takes a textfile and deduplicates it on a line basis usinf the xxhash algorithm
-func Dedup() {
+func Dedup(path string, dest string) error {
+	in, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	basename := filepath.Base(path)
+	name := strings.TrimSuffix(basename, filepath.Ext(basename))
+	out, err := os.Create(filepath.Join(dest, name+"_dedup"+filepath.Ext(basename)))
+	if err != nil {
+		return err
+	}
+
 	bufin := bufio.NewReader(in)
 	bufout := bufio.NewWriter(out)
 
@@ -23,4 +37,5 @@ func Dedup() {
 	bufout.Flush()
 	in.Close()
 	out.Close()
+	return nil
 }
