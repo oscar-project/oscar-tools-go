@@ -15,7 +15,7 @@ import (
 func sha256sum(dst string, sum *bufio.Writer) error {
 	f, err := os.Open(dst)
 	if err != nil {
-		return (err)
+		return err
 	}
 
 	h := sha256.New()
@@ -23,7 +23,6 @@ func sha256sum(dst string, sum *bufio.Writer) error {
 		return err
 	}
 	fmt.Fprintf(sum, "%s\t%x\n", filepath.Base(dst), h.Sum(nil))
-
 	f.Close()
 	return nil
 }
@@ -47,7 +46,9 @@ func copyCompress(src *bufio.Reader, sum *bufio.Writer, dst string) error {
 	zipout.Close()
 	out.Close()
 
-	return sha256sum(dst, sum)
+	err = sha256sum(dst, sum)
+	sum.Flush()
+	return err
 }
 
 func copyNcompress(src *bufio.Reader, sum *bufio.Writer, dst string, chunkSize int64) error {
