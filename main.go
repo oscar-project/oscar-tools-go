@@ -18,7 +18,7 @@ func main() {
 	chunkSize, _ := strconv.ParseInt(os.Args[3], 10, 64)
 
 	var wg sync.WaitGroup
-	maxGoroutines := 10
+	maxGoroutines := 48
 	guard := make(chan struct{}, maxGoroutines)
 
 	for path := range paths {
