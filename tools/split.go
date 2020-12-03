@@ -75,6 +75,7 @@ func Split(path string, dest string, chunkSize int64, compress bool) error {
 	if err != nil {
 		return err
 	}
+
 	var sumPath strings.Builder
 	sumPath.WriteString(folderName)
 	sumPath.WriteString("/")
@@ -86,6 +87,9 @@ func Split(path string, dest string, chunkSize int64, compress bool) error {
 		return err
 	}
 	sum := bufio.NewWriter(sumFile)
+	dsts := make(chan string, 50)
+
+	errc := sha256sum(dsts, sum)
 
 	fileInfo, err := in.Stat()
 	if err != nil {
@@ -96,7 +100,7 @@ func Split(path string, dest string, chunkSize int64, compress bool) error {
 		filePath := filepath.Join(folderName, fileInfo.Name())
 		if compress {
 			filePath = filePath + ".gz"
-			return copyCompress(bufin, sum, filePath)
+			return copyCompress(bufin, dsts, filePath)
 		}
 		return copy(bufin, filePath)
 	}
@@ -114,7 +118,7 @@ func Split(path string, dest string, chunkSize int64, compress bool) error {
 		filePath := filepath.Join(folderName, filePathBuff.String())
 
 		if compress {
-			err = copyNcompress(bufin, sum, filePath, chunkSize)
+			err = copyNcompress(bufin, dsts, filePath, chunkSize)
 		} else {
 			err = copyN(bufin, filePath, chunkSize)
 		}
@@ -125,6 +129,12 @@ func Split(path string, dest string, chunkSize int64, compress bool) error {
 			return err
 		}
 		fileCounter++
+	}
+
+	close(dsts)
+
+	if err := <-errc; err != nil { // HLerrc
+		return err
 	}
 
 	in.Close()

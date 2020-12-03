@@ -12,22 +12,31 @@ import (
 	"time"
 )
 
-func sha256sum(dst string, sum *bufio.Writer) error {
-	f, err := os.Open(dst)
-	if err != nil {
-		return err
-	}
+func sha256sum(dsts <-chan string, sum *bufio.Writer) <-chan error {
+	errc := make(chan error, 1)
+	go func() {
+		for dst := range dsts {
+			f, err := os.Open(dst)
+			if err != nil {
+				errc <- err
+				break
+			}
 
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return err
-	}
-	fmt.Fprintf(sum, "%s\t%x\n", filepath.Base(dst), h.Sum(nil))
-	f.Close()
-	return nil
+			h := sha256.New()
+			if _, err := io.Copy(h, f); err != nil {
+				errc <- err
+				break
+			}
+			fmt.Fprintf(sum, "%s\t%x\n", filepath.Base(dst), h.Sum(nil))
+			f.Close()
+			sum.Flush()
+		}
+		errc <- nil
+	}()
+	return errc
 }
 
-func copyCompress(src *bufio.Reader, sum *bufio.Writer, dst string) error {
+func copyCompress(src *bufio.Reader, dsts chan<- string, dst string) error {
 	out, err := os.Create(dst)
 	if err != nil {
 		return err
@@ -46,12 +55,12 @@ func copyCompress(src *bufio.Reader, sum *bufio.Writer, dst string) error {
 	zipout.Close()
 	out.Close()
 
-	err = sha256sum(dst, sum)
-	sum.Flush()
+	dsts <- dst
+	close(dsts)
 	return err
 }
 
-func copyNcompress(src *bufio.Reader, sum *bufio.Writer, dst string, chunkSize int64) error {
+func copyNcompress(src *bufio.Reader, dsts chan<- string, dst string, chunkSize int64) error {
 	out, err := os.Create(dst)
 	if err != nil {
 		return err
@@ -69,9 +78,7 @@ func copyNcompress(src *bufio.Reader, sum *bufio.Writer, dst string, chunkSize i
 			zipout.Close()
 			out.Close()
 
-			if err2 := sha256sum(dst, sum); err2 != nil {
-				return err2
-			}
+			dsts <- dst
 
 			return err
 		}
@@ -91,9 +98,7 @@ func copyNcompress(src *bufio.Reader, sum *bufio.Writer, dst string, chunkSize i
 			zipout.Close()
 			out.Close()
 
-			if err2 := sha256sum(dst, sum); err2 != nil {
-				return err2
-			}
+			dsts <- dst
 
 			return err
 		}
@@ -103,9 +108,9 @@ func copyNcompress(src *bufio.Reader, sum *bufio.Writer, dst string, chunkSize i
 	zipout.Flush()
 	zipout.Close()
 	out.Close()
-	if err2 := sha256sum(dst, sum); err2 != nil {
-		return err2
-	}
+
+	dsts <- dst
+
 	return nil
 }
 
