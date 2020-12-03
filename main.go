@@ -25,7 +25,7 @@ func main() {
 		wg.Add(1)
 		go func(path string) {
 			guard <- struct{}{}
-			err := tools.Split(path, os.Args[2], chunkSize) // HLc
+			err := tools.Split(path, os.Args[2], chunkSize, true) // HLc
 			//err := tools.Dedup(path, os.Args[2]) // HLc
 			if err != nil {
 				log.Fatalln(err)

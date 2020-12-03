@@ -23,18 +23,20 @@ func copy(src *bufio.Reader, dst string) error {
 	return out.Close()
 }
 
-func copyN(src *bufio.Reader, dst string, chunkSize int64) (int64, error) {
+func copyN(src *bufio.Reader, dst string, chunkSize int64) error {
 	out, err := os.Create(dst)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	bufout := bufio.NewWriter(out)
-	written, err := io.CopyN(bufout, src, chunkSize)
+	_, err = io.CopyN(bufout, src, chunkSize)
 	if err != nil {
 		if err == io.EOF {
-			return written, err
+			bufout.Flush()
+			out.Close()
+			return err
 		}
-		return 0, err
+		return err
 	}
 	doc := 0
 	for par, err := src.ReadString('\n'); err == nil && doc < 2; par, err = src.ReadString('\n') {
@@ -43,12 +45,20 @@ func copyN(src *bufio.Reader, dst string, chunkSize int64) (int64, error) {
 			doc++
 		}
 	}
+	if err != nil {
+		if err == io.EOF {
+			bufout.Flush()
+			out.Close()
+			return err
+		}
+		return err
+	}
 	bufout.Flush()
-	return written, out.Close()
+	return out.Close()
 }
 
 // Split splits plaintext files into a files of a given size
-func Split(path string, dest string, chunkSize int64) error {
+func Split(path string, dest string, chunkSize int64, compress bool) error {
 	in, err := os.Open(path)
 	if err != nil {
 		return err
@@ -65,6 +75,17 @@ func Split(path string, dest string, chunkSize int64) error {
 	if err != nil {
 		return err
 	}
+	var sumPath strings.Builder
+	sumPath.WriteString(folderName)
+	sumPath.WriteString("/")
+	sumPath.WriteString(name)
+	sumPath.WriteString("_sha256")
+	sumPath.WriteString(".txt")
+	sumFile, err := os.OpenFile(sumPath.String(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	sum := bufio.NewWriter(sumFile)
 
 	fileInfo, err := in.Stat()
 	if err != nil {
@@ -73,28 +94,41 @@ func Split(path string, dest string, chunkSize int64) error {
 
 	if fileInfo.Size() <= chunkSize {
 		filePath := filepath.Join(folderName, fileInfo.Name())
+		if compress {
+			filePath = filePath + ".gz"
+			return copyCompress(bufin, sum, filePath)
+		}
 		return copy(bufin, filePath)
 	}
 
 	fileCounter := 1
-	var written int64
-	for written = 0; written < fileInfo.Size(); fileCounter++ {
+	for {
 		var filePathBuff strings.Builder
 		filePathBuff.WriteString(name)
 		filePathBuff.WriteString("_part_")
 		filePathBuff.WriteString(strconv.Itoa(fileCounter))
 		filePathBuff.WriteString(filepath.Ext(basename))
+		if compress {
+			filePathBuff.WriteString(".gz")
+		}
 		filePath := filepath.Join(folderName, filePathBuff.String())
 
-		auxWritten, err := copyN(bufin, filePath, chunkSize)
+		if compress {
+			err = copyNcompress(bufin, sum, filePath, chunkSize)
+		} else {
+			err = copyN(bufin, filePath, chunkSize)
+		}
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 			return err
 		}
-		written += auxWritten
+		fileCounter++
 	}
 
+	in.Close()
+	sum.Flush()
+	sumFile.Close()
 	return nil
 }
