@@ -58,7 +58,7 @@ func copyN(src *bufio.Reader, dst string, chunkSize int64) error {
 }
 
 // Split splits plaintext files into a files of a given size
-func Split(path string, dest string, chunkSize int64, compress bool) error {
+func Split(path string, dest string, chunkSize int64, compress, shuff bool) error {
 	in, err := os.Open(path)
 	if err != nil {
 		return err
@@ -118,7 +118,7 @@ func Split(path string, dest string, chunkSize int64, compress bool) error {
 		filePath := filepath.Join(folderName, filePathBuff.String())
 
 		if compress {
-			err = copyNcompress(bufin, dsts, filePath, chunkSize)
+			err = copyNcompress(bufin, dsts, filePath, chunkSize, shuff)
 		} else {
 			err = copyN(bufin, filePath, chunkSize)
 		}

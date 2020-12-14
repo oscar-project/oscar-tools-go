@@ -60,7 +60,7 @@ func copyCompress(src *bufio.Reader, dsts chan<- string, dst string) error {
 	return err
 }
 
-func copyNcompress(src *bufio.Reader, dsts chan<- string, dst string, chunkSize int64) error {
+func copyNcompress(src *bufio.Reader, dsts chan<- string, dst string, chunkSize int64, shuff bool) error {
 	out, err := os.Create(dst)
 	if err != nil {
 		return err
@@ -84,14 +84,20 @@ func copyNcompress(src *bufio.Reader, dsts chan<- string, dst string, chunkSize 
 		}
 		return err
 	}
-	doc := 0
-	for par, err := src.ReadBytes('\n'); err == nil && doc < 2; par, err = src.ReadBytes('\n') {
-		zipout.Write(par)
-		if string(par) == "\n" {
-			doc++
+
+	if !shuff {
+		doc := 0
+		for par, err := src.ReadBytes('\n'); err == nil && doc < 2; par, err = src.ReadBytes('\n') {
+			zipout.Write(par)
+			if string(par) == "\n" {
+				doc++
+			}
 		}
 	}
 
+	// TODO: Add condition for unshuff
+	par, err := src.ReadBytes('\n')
+	zipout.Write(par)
 	if err != nil {
 		if err == io.EOF {
 			zipout.Flush()
